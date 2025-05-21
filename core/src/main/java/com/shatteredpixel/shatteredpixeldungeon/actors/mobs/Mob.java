@@ -21,6 +21,7 @@
 
 package com.shatteredpixel.shatteredpixeldungeon.actors.mobs;
 
+
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
@@ -89,6 +90,7 @@ import com.shatteredpixel.shatteredpixeldungeon.plants.Swiftthistle;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.CharSprite;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
+import com.shatteredpixel.shatteredpixeldungeon.utils.GameLogger;
 import com.watabou.noosa.audio.Sample;
 import com.watabou.utils.Bundle;
 import com.watabou.utils.PathFinder;
@@ -101,7 +103,17 @@ import java.util.Comparator;
 import java.util.HashSet;
 
 public abstract class Mob extends Char {
+	private int mobId;
+	private static int nextId = 1;
 
+	public Mob() {
+		super();
+		mobId = nextId++;
+	}
+
+	public int getId() {
+		return mobId;
+	}
 	{
 		actPriority = MOB_PRIO;
 		
@@ -138,6 +150,7 @@ public abstract class Mob extends Char {
 			float percent = HP / (float) HT;
 			HT = Math.round(HT * AscensionChallenge.statModifier(this));
 			HP = Math.round(HT * percent);
+			GameLogger.logSpawn(this);
 			firstAdded = false;
 		}
 	}
@@ -225,6 +238,7 @@ public abstract class Mob extends Char {
 		
 		if (justAlerted){
 			sprite.showAlert();
+			GameLogger.logAlert(this);
 		} else {
 			sprite.hideAlert();
 			sprite.hideLost();
@@ -236,8 +250,17 @@ public abstract class Mob extends Char {
 			return true;
 		}
 
-		if (buff(Terror.class) != null || buff(Dread.class) != null ){
+		String prevStateTag;
+		if (state == SLEEPING) prevStateTag = Sleeping.TAG;
+		else if (state == WANDERING) prevStateTag = Wandering.TAG;
+		else if (state == HUNTING) prevStateTag = Hunting.TAG;
+		else if (state == FLEEING) prevStateTag = Fleeing.TAG;
+		else if (state == PASSIVE) prevStateTag = Passive.TAG;
+		else prevStateTag = "UNKNOWN";
+
+		if (buff(Terror.class) != null || buff(Dread.class) != null) {
 			state = FLEEING;
+			GameLogger.logStateTransition(this, prevStateTag, Fleeing.TAG);
 		}
 		
 		enemy = chooseEnemy();
@@ -458,8 +481,10 @@ public abstract class Mob extends Char {
 				if (enemySeen) {
 					sprite.showStatus(CharSprite.WARNING, Messages.get(this, "rage"));
 					state = HUNTING;
+					GameLogger.logStateTransition(this, "FLEEING", "HUNTING");
 				} else {
 					state = WANDERING;
+					GameLogger.logStateTransition(this, "FLEEING", "WANDERING");
 				}
 			}
 			return true;
@@ -730,6 +755,7 @@ public abstract class Mob extends Char {
 			if (state != HUNTING) {
 				aggro(enemy);
 				target = enemy.pos;
+				GameLogger.logTargetAssignment(Mob.this, Dungeon.hero != null ? "Hero" : "target");
 			} else {
 				recentlyAttackedBy.add(enemy);
 			}
@@ -787,6 +813,7 @@ public abstract class Mob extends Char {
 		enemy = null;
 		enemySeen = false;
 		if (state == HUNTING) state = WANDERING;
+		GameLogger.logStateTransition(this, "HUNTING", "WANDERING");
 	}
 	
 	public boolean isTargeting( Char ch){
@@ -1122,6 +1149,7 @@ public abstract class Mob extends Char {
 				enemySeen = true;
 				notice();
 				state = HUNTING;
+				GameLogger.logStateTransition(Mob.this, "SLEEPING", "HUNTING");
 				target = enemy.pos;
 			} else {
 				notice();
